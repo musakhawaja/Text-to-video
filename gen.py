@@ -161,8 +161,18 @@ def gen_image(person, text,count):
             f.write(response.content)
         return f'image_{count}.jpg'
     else:
-        print("Failed to download the image")
+        print("Failed to download the image: ", response)
 
+def reset_app():
+    # Cleanup existing files
+    cleanup()
+
+    # Reset session state or specific variables
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    # Optionally, reinitialize certain state variables or redirect to the start
+    st.experimental_rerun()
 
 def extract_key_value_pairs(data):
     pattern = re.compile(r'\"(.*?)\"\s*:\s*\"(.*?)\"', re.DOTALL)
@@ -243,60 +253,89 @@ def script(text):
         response_format={"type": "json_object"}
     )
     result = completion.choices[0].message.content
-    key_value_pairs = extract_key_value_pairs(result)
-    print("KEY VALUE PARIS: ", key_value_pairs)
-    audios, images = voice_search(key_value_pairs)
-    print(f"AUDIOS: {audios}\n\n\nIMAGES: {images}")
-    clips = []
-    # audios = ['audio_0.mp3', 'audio_1.mp3', 'audio_2.mp3', 'audio_3.mp3', 'audio_4.mp3', 'audio_5.mp3', 'audio_6.mp3', 'audio_7.mp3', 'audio_8.mp3', 'audio_9.mp3', 'audio_10.mp3', 'audio_11.mp3', 'audio_12.mp3', 'audio_13.mp3', 'audio_14.mp3']
-    # images = ['image_0.jpg', 'image_1.jpg', 'image_2.jpg', 'image_3.jpg', 'image_4.jpg', 'image_5.jpg', 'image_6.jpg', 'image_7.jpg', 'image_8.jpg', 'image_9.jpg', 'image_10.jpg', 'image_11.jpg', 'image_12.jpg', 'image_13.jpg', 'image_14.jpg']
-
-    for audio, image in zip(audios, images):
-        audio_clip = AudioFileClip(audio)
-        img_clip = ImageClip(image, duration=audio_clip.duration)
-        
-        img_clip = zoom_in_effect(img_clip, 0.02)
-        
-        img_clip = img_clip.set_audio(audio_clip)
-        clips.append(img_clip)
+    return result
 
 
-    final_clip = concatenate_videoclips(clips, method="compose")
-    final_clip.write_videofile("output_video.mp4", codec="libx264", fps=24)
-    extract_audio("output_video.mp4", "final_audio.mp3")
-    transcription_result = transcribe_audio("final_audio.mp3")
-    srt_path = "final_subtitles.srt"
+st.title("Video Generation App")
 
-    with open(srt_path, 'w') as file:
-        file.write(transcription_result)
+if 'key_value_pairs' not in st.session_state:
+    st.session_state['key_value_pairs'] = []
+if 'audios' not in st.session_state:
+    st.session_state['audios'] = []
+if 'images' not in st.session_state:
+    st.session_state['images'] = []
+if 'cleanup_done' not in st.session_state:
+    st.session_state['cleanup_done'] = False 
 
-    add_subtitles("output_video.mp4", "final_subtitles.srt", "final_video_with_subtitles.mp4")
-    print("SUBS GENERATED")
-    cleanup()
-
-def create_video_from_prompt(text):
-    script(text) 
-    return "final_video_with_subtitles.mp4"
-
-st.title('Text to video generator')
-
-user_input = st.text_area("Enter your prompt:", "Write a story on batman and flash taking on the joker")
-generate_button = st.button('Generate Video')
+user_prompt = st.text_area("Enter your prompt to generate a video:", height=150)
+generate_button = st.button("Generate Script")
 
 if generate_button:
-    with st.spinner('Generating video... Please wait. This can take upto 5 minutes'):
-        video_file = create_video_from_prompt(user_input)
+    with st.spinner('Processing your script...'):
+        result = script(user_prompt)
+        st.session_state['edited_script'] = result  
 
-    if os.path.exists(video_file):
-        video_file_path = f"./{video_file}"
-        st.video(video_file_path)
-        st.download_button(
-            label="Download Video",
-            data=open(video_file_path, "rb"),
-            file_name=video_file,
-            mime="video/mp4"
-        )
-        os.remove(video_file_path)
-    else:
-        st.error("Failed to generate video.")
+if 'edited_script' in st.session_state:
+    edited_script = st.text_area("Edit the script as necessary:", value=st.session_state['edited_script'], height=300)
+    confirm_button = st.button("Confirm Script Edits")
 
+    if confirm_button:
+        with st.spinner('Updating script and generating audio/images...'):
+            key_value_pairs = extract_key_value_pairs(edited_script)
+            st.session_state['key_value_pairs'] = key_value_pairs
+
+            audios, images = voice_search(key_value_pairs)
+            st.session_state['audios'] = audios
+            st.session_state['images'] = images
+
+if st.session_state['images']:
+    for idx, image in enumerate(st.session_state['images']):
+        st.image(image, caption=f"Image {idx + 1}", use_column_width=True)
+
+    image_to_replace = st.selectbox("Select an image to replace:", options=list(range(len(st.session_state['images']))), format_func=lambda x: f"Image {x + 1}")
+    new_image = st.file_uploader("Upload new image:", type=["jpg", "jpeg", "png"], key="new_image_uploader")
+    replace_button = st.button("Replace Image")
+
+    if replace_button and new_image:
+        image_path = st.session_state['images'][image_to_replace]
+        with open(image_path, "wb") as f:
+            f.write(new_image.getvalue())
+        st.success(f"Replaced Image {image_to_replace + 1}")
+
+    if st.button("Generate Video"):
+        with st.spinner('Generating video and subtitles...'):
+            clips = []
+            for audio, image in zip(st.session_state['audios'], st.session_state['images']):
+                audio_clip = AudioFileClip(audio)
+                img_clip = ImageClip(image, duration=audio_clip.duration).set_audio(audio_clip)
+                img_clip = zoom_in_effect(img_clip, 0.02)
+                clips.append(img_clip)
+
+            final_clip = concatenate_videoclips(clips, method="compose")
+            final_clip_path = "output_video.mp4"
+            final_clip.write_videofile(final_clip_path, codec="libx264", fps=24)
+            extract_audio("output_video.mp4", "final_audio.mp3")
+            transcription_result = transcribe_audio("final_audio.mp3")
+            cleanup()
+            srt_path = "final_subtitles.srt"
+            with open(srt_path, 'w') as file:
+                file.write(transcription_result)
+
+            add_subtitles(final_clip_path, srt_path, "final_video_with_subtitles.mp4")
+
+            
+            if os.path.exists("final_video_with_subtitles.mp4"):
+                video_file_path = "final_video_with_subtitles.mp4"
+                st.video(video_file_path)
+                st.download_button(
+                    label="Download Video",
+                    data=open(video_file_path, "rb"),
+                    file_name="final_video_with_subtitles.mp4",
+                    mime="video/mp4"
+                )
+                os.remove(video_file_path)
+            else:
+                st.error("Failed to generate video.")
+            
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
