@@ -5,12 +5,14 @@ from elevenlabs import clone, set_api_key, voices
 import re
 import requests
 import json
-from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
+from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip, ImageSequenceClip
 import subprocess
 import math
 from PIL import Image
 import numpy
 import streamlit as st
+import cv2
+
 load_dotenv()
 set_api_key(os.getenv("11LABS_API_KEY"))    
 client = OpenAI(api_key = os.getenv('OPENAI_API_KEY'))
@@ -145,7 +147,7 @@ def gen_image(person, text,count):
     prompt = data["prompt"]
     print("PROMPT: ", prompt)
     response = requests.post(
-        f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
+        f"https://api.stability.ai/v2beta/stable-image/generate/core",
         headers={
             "authorization": f"Bearer {os.getenv('SD_API_KEY')}",
             "accept": "image/*"
@@ -238,6 +240,32 @@ def zoom_in_effect(clip, zoom_ratio=0.008):
 
     return clip.fl(effect)
 
+
+# //////
+
+def create_zoom_in_frames(image_path, duration, fps=40, zoom_factor=1.2,zoom_increment_per_frame=0.002):
+    image = cv2.imread(image_path)
+    height, width = image.shape[:2]
+    frames = []
+    total_frames = int(duration * fps)  # Total number of frames for the given duration
+    zoom_factor = 1
+
+    for i in range(total_frames):
+        zoom_factor += zoom_increment_per_frame
+        new_width = int(width / zoom_factor)
+        new_height = int(height / zoom_factor)
+        x_center = width // 2
+        y_center = height // 2
+
+        cropped = image[int(y_center - new_height // 2):int(y_center + new_height // 2),
+                        int(x_center - new_width // 2):int(x_center + new_width // 2)]
+        resized = cv2.resize(cropped, (width, height))
+        frames.append(resized)
+
+    return [frame[:, :, ::-1] for frame in frames]
+
+
+
 def cleanup():
     for filename in os.listdir('.'):
         if filename.endswith('.mp3') or filename.endswith('.jpg'):
@@ -308,13 +336,15 @@ if st.session_state['images']:
             clips = []
             for audio, image in zip(st.session_state['audios'], st.session_state['images']):
                 audio_clip = AudioFileClip(audio)
+                # zoom_frames = create_zoom_in_frames(image, duration=audio_clip.duration)
+                # img_clip = ImageSequenceClip(zoom_frames, fps=40).set_audio(audio_clip)
                 img_clip = ImageClip(image, duration=audio_clip.duration).set_audio(audio_clip)
                 img_clip = zoom_in_effect(img_clip, 0.02)
                 clips.append(img_clip)
 
             final_clip = concatenate_videoclips(clips, method="compose")
             final_clip_path = "output_video.mp4"
-            final_clip.write_videofile(final_clip_path, codec="libx264", fps=24)
+            final_clip.write_videofile(final_clip_path, codec="libx264", fps=30)
             extract_audio("output_video.mp4", "final_audio.mp3")
             transcription_result = transcribe_audio("final_audio.mp3")
             cleanup()
