@@ -90,7 +90,7 @@ def generate_audio(voice_id, message, count):
             "style": 0.50,
             "use_speaker_boost": True
         },
-        "model_id": "eleven_turbo_v2",
+        "model_id": "eleven_multilingual_v2",
     }
     response = requests.post(url, headers=headers, json=data)
     
@@ -319,29 +319,43 @@ if 'edited_script' in st.session_state:
 
 if st.session_state['images']:
     for idx, (image, prompt) in enumerate(zip(st.session_state['images'], st.session_state['text_prompts'])):
-        st.image(image, caption=f"Image {idx + 1}: {prompt}", use_column_width=True)
+        try:
+            st.image(image, caption=f"Image {idx + 1}: {prompt}", use_column_width=True)
+        except Exception as e:
+            st.session_state['images'][idx] = None  # Set the problematic image to None
+            st.write(f"Placeholder for Image {idx + 1}: {prompt} (image not available)")
+            print(f"Failed to load image {idx + 1}: {prompt}. Error: {e}")
+
         
     image_to_replace = st.selectbox("Select an image to replace:", options=list(range(len(st.session_state['images']))), format_func=lambda x: f"Image {x + 1}")
     new_image = st.file_uploader("Upload new image:", type=["jpg", "jpeg", "png"], key="new_image_uploader")
     replace_button = st.button("Replace Image")
 
+    # if replace_button and new_image:
+    #     image_path = st.session_state['images'][image_to_replace]
+    #     with open(image_path, "wb") as f:
+    #         f.write(new_image.getvalue())
+    #     st.success(f"Replaced Image {image_to_replace + 1}")
+
     if replace_button and new_image:
-        image_path = st.session_state['images'][image_to_replace]
-        with open(image_path, "wb") as f:
-            f.write(new_image.getvalue())
-        st.success(f"Replaced Image {image_to_replace + 1}")
+        if st.session_state['images'][image_to_replace] is None or os.path.exists(st.session_state['images'][image_to_replace]):
+            image_path = f'image_{image_to_replace}.jpg'  # Define a standard path for new uploads
+            with open(image_path, "wb") as f:
+                f.write(new_image.getvalue())
+            st.session_state['images'][image_to_replace] = image_path
+            st.success(f"Replaced Image {image_to_replace + 1}")
 
     if st.button("Generate Video"):
         with st.spinner('Generating video and subtitles...'):
             clips = []
             for audio, image in zip(st.session_state['audios'], st.session_state['images']):
-                audio_clip = AudioFileClip(audio)
-                # zoom_frames = create_zoom_in_frames(image, duration=audio_clip.duration)
-                # img_clip = ImageSequenceClip(zoom_frames, fps=40).set_audio(audio_clip)
-                img_clip = ImageClip(image, duration=audio_clip.duration).set_audio(audio_clip)
-                img_clip = zoom_in_effect(img_clip, 0.02)
-                clips.append(img_clip)
-
+                try:
+                    audio_clip = AudioFileClip(audio)
+                    img_clip = ImageClip(image, duration=audio_clip.duration).set_audio(audio_clip)
+                    img_clip = zoom_in_effect(img_clip, 0.02)
+                    clips.append(img_clip)
+                except Exception as e:
+                    continue
             final_clip = concatenate_videoclips(clips, method="compose")
             final_clip_path = "output_video.mp4"
             final_clip.write_videofile(final_clip_path, codec="libx264", fps=30)
