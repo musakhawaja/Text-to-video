@@ -1,7 +1,9 @@
 elevenlabs==0.2.27
 moviepy==1.0.3
 numpy==1.24.4
-openai==1.24.1
+openai==1.25.0
+opencv_python==4.8.1.78
+opencv_python_headless==4.9.0.80
 Pillow==10.3.0
 python-dotenv==1.0.1
 Requests==2.31.0
