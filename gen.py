@@ -28,6 +28,7 @@ def voice_search(pairs):
     history = {"NARRATOR": "adam"}
     audio_paths = []
     images_path = []
+    text_prompts = [] 
     count = 0  
     for pair in pairs:
         person, message = pair
@@ -58,6 +59,7 @@ def voice_search(pairs):
                     image_path = gen_image(person, message, count)
                     audio_paths.append(audio_path)
                     images_path.append(image_path)
+                    text_prompts.append(person + ": " + message)
                 
         else:
             for voice in voicess:
@@ -66,9 +68,10 @@ def voice_search(pairs):
                     image_path = gen_image(person, message, count)
                     audio_paths.append(audio_path)
                     images_path.append(image_path)
+                    text_prompts.append(person + ": " + message)
         count += 1
     print("AUDIO PATHS: ", audio_paths)
-    return audio_paths, images_path
+    return audio_paths, images_path, text_prompts
 
 def generate_audio(voice_id, message, count):
     url = f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}'
@@ -164,14 +167,11 @@ def gen_image(person, text,count):
         print("Failed to download the image: ", response)
 
 def reset_app():
-    # Cleanup existing files
     cleanup()
 
-    # Reset session state or specific variables
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
-    # Optionally, reinitialize certain state variables or redirect to the start
     st.experimental_rerun()
 
 def extract_key_value_pairs(data):
@@ -284,14 +284,15 @@ if 'edited_script' in st.session_state:
             key_value_pairs = extract_key_value_pairs(edited_script)
             st.session_state['key_value_pairs'] = key_value_pairs
 
-            audios, images = voice_search(key_value_pairs)
+            audios, images, text_prompts = voice_search(key_value_pairs)
             st.session_state['audios'] = audios
             st.session_state['images'] = images
+            st.session_state["text_prompts"] = text_prompts
 
 if st.session_state['images']:
-    for idx, image in enumerate(st.session_state['images']):
-        st.image(image, caption=f"Image {idx + 1}", use_column_width=True)
-
+    for idx, (image, prompt) in enumerate(zip(st.session_state['images'], st.session_state['text_prompts'])):
+        st.image(image, caption=f"Image {idx + 1}: {prompt}", use_column_width=True)
+        
     image_to_replace = st.selectbox("Select an image to replace:", options=list(range(len(st.session_state['images']))), format_func=lambda x: f"Image {x + 1}")
     new_image = st.file_uploader("Upload new image:", type=["jpg", "jpeg", "png"], key="new_image_uploader")
     replace_button = st.button("Replace Image")
