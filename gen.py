@@ -24,6 +24,21 @@ def normalize_text(text):
     text = " ".join(text.split())
     return text
 
+
+def load_audio_with_retry(audio_path, retries=3):
+    for attempt in range(retries):
+        try:
+            # Try to load the audio file
+            audio_clip = AudioFileClip(audio_path)
+            return audio_clip  # Successfully loaded, return the clip
+        except Exception as e:
+            print(f"Failed to load audio on attempt {attempt+1}: {e}")
+            if attempt < retries - 1:
+                # Retry generating audio
+                # Assuming you have the context to regenerate the audio
+                audio_path = generate_audio()  # Implement this function based on your context
+    raise Exception("Failed to load audio after multiple attempts.")
+
 def voice_search(pairs):
     voicess = voices()
     voices_dicts = [{"name": voice.name, "description": voice.description} for voice in voicess]
@@ -58,6 +73,14 @@ def voice_search(pairs):
             for voice in voicess:
                 if normalize_text(voice.name) == selected_voice_name:
                     audio_path = generate_audio(voice.voice_id, message, count)
+                    for attempt in range(2):
+                        try:
+                            AudioFileClip(audio_path)
+                            break
+                        except Exception as e:
+                            print(f"Failed to load audio on attempt {attempt+1}: {e}")
+                            if attempt < 2 - 1:
+                                audio_path = generate_audio(voice.voice_id, message, count)
                     image_path = gen_image(person, message, count)
                     audio_paths.append(audio_path)
                     images_path.append(image_path)
@@ -67,6 +90,14 @@ def voice_search(pairs):
             for voice in voicess:
                 if normalize_text(voice.name) == history[person]:
                     audio_path = generate_audio(voice.voice_id, message, count)
+                    for attempt in range(2):
+                        try:
+                            AudioFileClip(audio_path)
+                            break
+                        except Exception as e:
+                            print(f"Failed to load audio on attempt {attempt+1}: {e}")
+                            if attempt < 2 - 1:
+                                audio_path = generate_audio(voice.voice_id, message, count)
                     image_path = gen_image(person, message, count)
                     audio_paths.append(audio_path)
                     images_path.append(image_path)
@@ -116,6 +147,8 @@ context = [{"role": "system", "content": """"
                 }
                 """
              }]
+
+
 history = []
 def gen_image(person, text,count):
     text = f"{person} says {text}"
@@ -309,7 +342,6 @@ if choice == 'Generate':
             st.session_state['edited_script'] = result  
 
 elif choice == 'Enter':
-    # Provide a text area for the user to write or paste their script
     manual_script = st.text_area("Enter your script here:", height=300)
     submit_script_button = st.button("Submit Script")
 
