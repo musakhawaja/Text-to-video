@@ -243,27 +243,52 @@ def zoom_in_effect(clip, zoom_ratio=0.008):
 
 # //////
 
-def create_zoom_in_frames(image_path, duration, fps=40, zoom_factor=1.2,zoom_increment_per_frame=0.002):
-    image = cv2.imread(image_path)
-    height, width = image.shape[:2]
-    frames = []
-    total_frames = int(duration * fps)  # Total number of frames for the given duration
-    zoom_factor = 1
+# def create_zoom_in_frames(image_path, duration, fps=40, zoom_factor=1.2,zoom_increment_per_frame=0.002):
+#     image = cv2.imread(image_path)
+#     height, width = image.shape[:2]
+#     frames = []
+#     total_frames = int(duration * fps)  # Total number of frames for the given duration
+#     zoom_factor = 1
 
-    for i in range(total_frames):
-        zoom_factor += zoom_increment_per_frame
-        new_width = int(width / zoom_factor)
-        new_height = int(height / zoom_factor)
-        x_center = width // 2
-        y_center = height // 2
+#     for i in range(total_frames):
+#         zoom_factor += zoom_increment_per_frame
+#         new_width = int(width / zoom_factor)
+#         new_height = int(height / zoom_factor)
+#         x_center = width // 2
+#         y_center = height // 2
 
-        cropped = image[int(y_center - new_height // 2):int(y_center + new_height // 2),
-                        int(x_center - new_width // 2):int(x_center + new_width // 2)]
-        resized = cv2.resize(cropped, (width, height))
-        frames.append(resized)
+#         cropped = image[int(y_center - new_height // 2):int(y_center + new_height // 2),
+#                         int(x_center - new_width // 2):int(x_center + new_width // 2)]
+#         resized = cv2.resize(cropped, (width, height))
+#         frames.append(resized)
 
-    return [frame[:, :, ::-1] for frame in frames]
+#     return [frame[:, :, ::-1] for frame in frames]
 
+
+
+def adjust_image(image_path, output_width=2040, output_height=1152):
+    with Image.open(image_path) as img:
+        # Calculate the current and target aspect ratios
+        current_aspect_ratio = img.width / img.height
+        target_aspect_ratio = output_width / output_height
+
+        # Determine the cropping box dimensions based on the aspect ratios
+        if current_aspect_ratio > target_aspect_ratio:
+            # Image is too wide
+            new_width = int(target_aspect_ratio * img.height)
+            left = (img.width - new_width) // 2
+            img = img.crop((left, 0, left + new_width, img.height))
+        elif current_aspect_ratio < target_aspect_ratio:
+            # Image is too tall
+            new_height = int(img.width / target_aspect_ratio)
+            top = (img.height - new_height) // 2
+            img = img.crop((0, top, img.width, top + new_height))
+
+        # Resize the image to the target resolution
+        img = img.resize((output_width, output_height), Image.LANCZOS)
+
+        # Save or overwrite the adjusted image
+        img.save(image_path)
 
 
 def cleanup():
@@ -342,6 +367,7 @@ if st.session_state['images']:
             image_path = f'image_{image_to_replace}.jpg'  # Define a standard path for new uploads
             with open(image_path, "wb") as f:
                 f.write(new_image.getvalue())
+            adjust_image(image_path)
             st.session_state['images'][image_to_replace] = image_path
             st.success(f"Replaced Image {image_to_replace + 1}")
 
