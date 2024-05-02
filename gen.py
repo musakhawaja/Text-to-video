@@ -241,53 +241,22 @@ def zoom_in_effect(clip, zoom_ratio=0.008):
     return clip.fl(effect)
 
 
-# //////
-
-# def create_zoom_in_frames(image_path, duration, fps=40, zoom_factor=1.2,zoom_increment_per_frame=0.002):
-#     image = cv2.imread(image_path)
-#     height, width = image.shape[:2]
-#     frames = []
-#     total_frames = int(duration * fps)  # Total number of frames for the given duration
-#     zoom_factor = 1
-
-#     for i in range(total_frames):
-#         zoom_factor += zoom_increment_per_frame
-#         new_width = int(width / zoom_factor)
-#         new_height = int(height / zoom_factor)
-#         x_center = width // 2
-#         y_center = height // 2
-
-#         cropped = image[int(y_center - new_height // 2):int(y_center + new_height // 2),
-#                         int(x_center - new_width // 2):int(x_center + new_width // 2)]
-#         resized = cv2.resize(cropped, (width, height))
-#         frames.append(resized)
-
-#     return [frame[:, :, ::-1] for frame in frames]
-
-
-
 def adjust_image(image_path, output_width=2040, output_height=1152):
     with Image.open(image_path) as img:
-        # Calculate the current and target aspect ratios
         current_aspect_ratio = img.width / img.height
         target_aspect_ratio = output_width / output_height
 
-        # Determine the cropping box dimensions based on the aspect ratios
         if current_aspect_ratio > target_aspect_ratio:
-            # Image is too wide
             new_width = int(target_aspect_ratio * img.height)
             left = (img.width - new_width) // 2
             img = img.crop((left, 0, left + new_width, img.height))
         elif current_aspect_ratio < target_aspect_ratio:
-            # Image is too tall
             new_height = int(img.width / target_aspect_ratio)
             top = (img.height - new_height) // 2
             img = img.crop((0, top, img.width, top + new_height))
 
-        # Resize the image to the target resolution
         img = img.resize((output_width, output_height), Image.LANCZOS)
 
-        # Save or overwrite the adjusted image
         img.save(image_path)
 
 
@@ -320,13 +289,32 @@ if 'images' not in st.session_state:
 if 'cleanup_done' not in st.session_state:
     st.session_state['cleanup_done'] = False 
 
-user_prompt = st.text_area("Enter your prompt to generate a video:", height=150)
-generate_button = st.button("Generate Script")
+# user_prompt = st.text_area("Enter your prompt to generate a video:", height=150)
+# generate_button = st.button("Generate Script")
 
-if generate_button:
-    with st.spinner('Processing your script...'):
-        result = script(user_prompt)
-        st.session_state['edited_script'] = result  
+# if generate_button:
+#     with st.spinner('Processing your script...'):
+#         result = script(user_prompt)
+#         st.session_state['edited_script'] = result  
+
+choice = st.radio("Do you want to generate a new script or enter your own?", ('Generate', 'Enter'))
+
+if choice == 'Generate':
+    user_prompt = st.text_area("Enter your prompt to generate a video:", height=150)
+    generate_button = st.button("Generate Script")
+
+    if generate_button:
+        with st.spinner('Processing your script...'):
+            result = script(user_prompt)  # Call your script function here
+            st.session_state['edited_script'] = result  
+
+elif choice == 'Enter':
+    # Provide a text area for the user to write or paste their script
+    manual_script = st.text_area("Enter your script here:", height=300)
+    submit_script_button = st.button("Submit Script")
+
+    if submit_script_button:
+        st.session_state['edited_script'] = manual_script 
 
 if 'edited_script' in st.session_state:
     edited_script = st.text_area("Edit the script as necessary:", value=st.session_state['edited_script'], height=300)
