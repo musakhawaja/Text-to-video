@@ -28,15 +28,12 @@ def normalize_text(text):
 def load_audio_with_retry(audio_path, retries=3):
     for attempt in range(retries):
         try:
-            # Try to load the audio file
             audio_clip = AudioFileClip(audio_path)
-            return audio_clip  # Successfully loaded, return the clip
+            return audio_clip 
         except Exception as e:
             print(f"Failed to load audio on attempt {attempt+1}: {e}")
             if attempt < retries - 1:
-                # Retry generating audio
-                # Assuming you have the context to regenerate the audio
-                audio_path = generate_audio()  # Implement this function based on your context
+                audio_path = generate_audio()
     raise Exception("Failed to load audio after multiple attempts.")
 
 def voice_search(pairs):
@@ -322,14 +319,6 @@ if 'images' not in st.session_state:
 if 'cleanup_done' not in st.session_state:
     st.session_state['cleanup_done'] = False 
 
-# user_prompt = st.text_area("Enter your prompt to generate a video:", height=150)
-# generate_button = st.button("Generate Script")
-
-# if generate_button:
-#     with st.spinner('Processing your script...'):
-#         result = script(user_prompt)
-#         st.session_state['edited_script'] = result  
-
 choice = st.radio("Do you want to generate a new script or enter your own?", ('Generate', 'Enter'))
 
 if choice == 'Generate':
@@ -338,7 +327,7 @@ if choice == 'Generate':
 
     if generate_button:
         with st.spinner('Processing your script...'):
-            result = script(user_prompt)  # Call your script function here
+            result = script(user_prompt)  
             st.session_state['edited_script'] = result  
 
 elif choice == 'Enter':
@@ -367,7 +356,7 @@ if st.session_state['images']:
         try:
             st.image(image, caption=f"Image {idx + 1}: {prompt}", use_column_width=True)
         except Exception as e:
-            st.session_state['images'][idx] = None  # Set the problematic image to None
+            st.session_state['images'][idx] = None 
             st.write(f"Placeholder for Image {idx + 1}: {prompt} (image not available)")
             print(f"Failed to load image {idx + 1}: {prompt}. Error: {e}")
 
@@ -375,12 +364,6 @@ if st.session_state['images']:
     image_to_replace = st.selectbox("Select an image to replace:", options=list(range(len(st.session_state['images']))), format_func=lambda x: f"Image {x + 1}")
     new_image = st.file_uploader("Upload new image:", type=["jpg", "jpeg", "png"], key="new_image_uploader")
     replace_button = st.button("Replace Image")
-
-    # if replace_button and new_image:
-    #     image_path = st.session_state['images'][image_to_replace]
-    #     with open(image_path, "wb") as f:
-    #         f.write(new_image.getvalue())
-    #     st.success(f"Replaced Image {image_to_replace + 1}")
 
     if replace_button and new_image:
         if st.session_state['images'][image_to_replace] is None or os.path.exists(st.session_state['images'][image_to_replace]):
